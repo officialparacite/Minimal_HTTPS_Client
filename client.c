@@ -16,6 +16,7 @@
 
 #define BUF_SIZE 100000
 #define MAX_REDIRECTS 5
+#define INITIAL_RESPONSE_SIZE 102400
 
 static void errMsg(const char* msg);
 static void urlParser(const char* url, char* hostname, char* path);
@@ -50,7 +51,6 @@ int main(int argc, char* argv[]) {
     snprintf(currentUrl, BUF_SIZE, "%s", argv[optind]);
 
     int redirect_count = 0;
-    char responseBuffer[BUF_SIZE * 4];
 
     do {
         char hostname[BUF_SIZE];
@@ -135,29 +135,66 @@ int main(int argc, char* argv[]) {
             exit(EXIT_FAILURE);
         }
 
-        ssize_t bytesRead;
-        size_t total_bytes = 0;
-        char buffer[BUF_SIZE];
-
-        memset(responseBuffer, 0, sizeof(responseBuffer));
-
-        while ((bytesRead = SSL_read(ssl, buffer, BUF_SIZE)) > 0) {
-            if (total_bytes + bytesRead < sizeof(responseBuffer)) {
-                memcpy(responseBuffer + total_bytes, buffer, bytesRead);
-                total_bytes += bytesRead;
-            } else {
-                fprintf(stderr, "Response too large for buffer\n");
-                break;
-            }
-        }
-
-        if (bytesRead < 0) {
-            errMsg("SSL_read() failed");
+        char* responseBuffer = malloc(INITIAL_RESPONSE_SIZE);
+        if (responseBuffer == NULL) {
+            errMsg("Failed to allocate memory for response");
             SSL_shutdown(ssl);
             SSL_free(ssl);
             SSL_CTX_free(ctx);
             close(sockFd);
             exit(EXIT_FAILURE);
+        }
+
+        size_t buffer_size = INITIAL_RESPONSE_SIZE;
+        size_t total_bytes = 0;
+        ssize_t bytesRead;
+        char read_buffer[BUF_SIZE];
+
+        while ((bytesRead = SSL_read(ssl, read_buffer, BUF_SIZE)) > 0) {
+            if (total_bytes + bytesRead >= buffer_size) {
+                buffer_size *= 2;
+                char* new_buffer = realloc(responseBuffer, buffer_size);
+                if (new_buffer == NULL) {
+                    errMsg("Failed to reallocate memory for response");
+                    free(responseBuffer);
+                    SSL_shutdown(ssl);
+                    SSL_free(ssl);
+                    SSL_CTX_free(ctx);
+                    close(sockFd);
+                    exit(EXIT_FAILURE);
+                }
+                responseBuffer = new_buffer;
+            }
+
+            memcpy(responseBuffer + total_bytes, read_buffer, bytesRead);
+            total_bytes += bytesRead;
+        }
+
+        if (bytesRead < 0) {
+            errMsg("SSL_read() failed");
+            free(responseBuffer);
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            SSL_CTX_free(ctx);
+            close(sockFd);
+            exit(EXIT_FAILURE);
+        }
+
+        if (total_bytes < buffer_size) {
+            responseBuffer[total_bytes] = '\0';
+        } else {
+            char* new_buffer = realloc(responseBuffer, buffer_size + 1);
+            if (new_buffer == NULL) {
+                errMsg("Failed to reallocate memory for null termination");
+                free(responseBuffer);
+                SSL_shutdown(ssl);
+                SSL_free(ssl);
+                SSL_CTX_free(ctx);
+                close(sockFd);
+                exit(EXIT_FAILURE);
+            }
+            responseBuffer = new_buffer;
+            responseBuffer[total_bytes] = '\0';
         }
 
         SSL_shutdown(ssl);
@@ -178,6 +215,7 @@ int main(int argc, char* argv[]) {
 
                 if (redirect_count > MAX_REDIRECTS) {
                     fprintf(stderr, "Too many redirects, giving up\n");
+                    free(responseBuffer);
                     exit(EXIT_FAILURE);
                 }
             }
@@ -186,10 +224,14 @@ int main(int argc, char* argv[]) {
         if (!redirect || !follow_redirects) {
             if (write(STDOUT_FILENO, responseBuffer, total_bytes) == -1) {
                 perror("write");
+                free(responseBuffer);
                 exit(EXIT_FAILURE);
             }
+            free(responseBuffer);
             break;
         }
+
+        free(responseBuffer);
 
     } while (follow_redirects);
 

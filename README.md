@@ -1,6 +1,6 @@
 # HTTPS Client in C using OpenSSL
 
-This repository contains two simple HTTPS clients written in C using OpenSSL. These programs demonstrate how to make secure HTTP requests over SSL/TLS using the OpenSSL library.
+This repository contains a simple HTTPS client written in C using OpenSSL. The program demonstrates how to make secure HTTP requests over SSL/TLS using the OpenSSL library.
 
 ## Files
 
@@ -8,17 +8,13 @@ This repository contains two simple HTTPS clients written in C using OpenSSL. Th
 - A basic HTTPS client.
 - Connects to an HTTPS server using SSL/TLS.
 - Sends a GET request and prints the response.
-- Uses static buffers for storing the response.
-
-### `client2.c`
-- Same as `client.c`, but dynamically allocates memory using `malloc()` to store the response.
-- Useful for handling larger or unknown response sizes.
+- dynamically allocates memory for the response.
 
 ## Build Instructions
 
 Make sure you have OpenSSL development libraries installed.
 
-To build the clients, run:
+To build the client, run:
 
 ```bash
 make
