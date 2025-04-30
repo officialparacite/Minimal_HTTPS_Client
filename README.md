@@ -8,7 +8,7 @@ This repository contains a simple HTTPS client written in C using OpenSSL. The p
 - A basic HTTPS client.
 - Connects to an HTTPS server using SSL/TLS.
 - Sends a GET request and prints the response.
-- dynamically allocates memory for the response.
+- Dynamically allocates memory for the response.
 
 ## Build Instructions
 
