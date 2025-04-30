@@ -2,16 +2,19 @@ CC = gcc
 CFLAGS = -Wall -Wextra -O2
 LDFLAGS = -lssl -lcrypto
 
-TARGETS = client client2
+TARGETS = build/client build/client2
 SOURCES = client.c client2.c
 
-all: $(TARGETS)
+all: build $(TARGETS)
 
-client: client.c
-	$(CC) $(CFLAGS) -o client client.c $(LDFLAGS)
+build:
+	mkdir -p build
 
-client2: client2.c
-	$(CC) $(CFLAGS) -o client2 client2.c $(LDFLAGS)
+build/client: client.c
+	$(CC) $(CFLAGS) -o build/client client.c $(LDFLAGS)
+
+build/client2: client2.c
+	$(CC) $(CFLAGS) -o build/client2 client2.c $(LDFLAGS)
 
 clean:
-	rm -f $(TARGETS)
+	rm -rf build
